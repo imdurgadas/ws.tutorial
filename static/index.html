@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Websockets using NestJS</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://unpkg.com/vue-simple-notify/dist/vue-simple-notify.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.12"></script>
+    <script src="https://unpkg.com/vue-simple-notify/dist/vue-simple-notify.min.js"></script> 
+    <script src="/socket.io/socket.io.js"></script>
+  </head>
+  <body>
+    <main id = "v-app">
+        <section class="alerts">
+            <alerts-component :items="alerts"></alerts-component>
+        </section>
+        <section class="chat">
+            <h1>Websockets Chat</h1>
+            <form>
+                <input type="text" name="" id="msg" v-model="text">
+                <button type="submit" @click.prevent="sendChatMesage()">Send</button>
+            </form>
+
+            <p>
+                <ul>
+                    <li v-for="msg of messages"><strong>{{ msg.sender }}</strong> : {{msg.message}}</li>
+                </ul>
+            </p>
+        </section>
+
+    </main>
+    <script>
+        Vue.component('alerts-component', VueSimpleNotify.VueSimpleNotify);
+        var app = new Vue({
+            el: "#v-app",
+            data : {
+                username : '',
+                text: "",
+                room: 'general',
+                messages: [],
+                socket: {chat: null ,alerts : null},
+                alerts: []
+            },
+            methods : {
+                sendChatMesage(){
+                    console.log(`sent: ${this.text}`);
+                    this.socket.chat.emit('chatToServer', { sender : this.username , room: this.room, message : this.text});
+                    this.text="";
+                },
+                receiveChatMessage(msg){
+                    console.log(`received: ${msg}`);
+                    this.messages.push(msg);
+                },
+                receiveAlertMessage(msg){
+                    console.log(`Alert Message received : ${msg}`);
+                    this.alerts.push(msg);
+                }
+            },
+            created() {
+                this.username = prompt('Enter your username');
+                this.socket.chat = io("http://localhost:3000/chat"); //chat is namespace and not path, path is provided in options to the io object
+                this.socket.chat.on('chatToClient', (msg) => {
+                    this.receiveChatMessage(msg);
+                });
+
+                this.socket.chat.on('connect', () => {
+                    console.log('Connect room ', this.room)
+                    this.socket.chat.emit('joinRoom', this.room);
+                })
+
+                this.socket.chat.on('disconnect', () => {
+                    console.log('Disconnect room ', this.room)
+                    this.socket.chat.emit('leaveRoom', this.room);
+                })
+
+                this.socket.alerts = io("http://localhost:3000/alerts"); //chat is namespace and not path, path is provided in options to the io object
+                this.socket.alerts.on('alertToClient', (msg) => {
+                    this.receiveAlertMessage(msg);
+                })
+            }
+        })
+    </script>
+  </body>
+</html>
